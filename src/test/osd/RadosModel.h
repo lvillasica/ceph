@@ -184,6 +184,7 @@ public:
   AttrGenerator attr_gen;
   const bool no_omap;
   bool pool_snaps;
+  bool balance_reads;
   int snapname_num;
 
   RadosTestContext(const string &pool_name, 
@@ -193,6 +194,7 @@ public:
 		   uint64_t max_stride_size,
 		   bool no_omap,
 		   bool pool_snaps,
+		   bool balance_reads,
 		   const char *id = 0) :
     state_lock("Context Lock"),
     pool_obj_cont(),
@@ -208,6 +210,7 @@ public:
     attr_gen(2000, 20000),
     no_omap(no_omap),
     pool_snaps(pool_snaps),
+    balance_reads(balance_reads),
     snapname_num(0)
   {
   }
@@ -1046,7 +1049,9 @@ public:
       op.omap_get_header(&header, 0);
     }
     op.getxattrs(&xattrs, 0);
-    assert(!context->io_ctx.aio_operate(context->prefix+oid, completion, &op, 0));
+    unsigned flags = librados::OPERATION_BALANCE_READS;
+    assert(!context->io_ctx.aio_operate(context->prefix+oid, completion, &op,
+					flags, NULL));
     if (snap >= 0) {
       context->io_ctx.snap_set_read(0);
     }

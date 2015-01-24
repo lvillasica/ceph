@@ -265,6 +265,7 @@ int main(int argc, char **argv)
   string pool_name = "rbd";
   bool ec_pool = false;
   bool no_omap = false;
+  bool balance_reads = false;
 
   for (int i = 1; i < argc; ++i) {
     if (strcmp(argv[i], "--max-ops") == 0)
@@ -285,6 +286,8 @@ int main(int argc, char **argv)
       max_stride_size = atoi(argv[++i]);
     else if (strcmp(argv[i], "--no-omap") == 0)
       no_omap = true;
+    else if (strcmp(argv[i], "--balance_reads") == 0)
+      balance_reads = true;
     else if (strcmp(argv[i], "--pool-snaps") == 0)
       pool_snaps = true;
     else if (strcmp(argv[i], "--ec-pool") == 0) {
@@ -382,6 +385,7 @@ int main(int argc, char **argv)
     max_stride_size,
     no_omap,
     pool_snaps,
+    balance_reads,
     id);
 
   TestOpStat stats;
