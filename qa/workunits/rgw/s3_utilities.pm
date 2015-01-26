@@ -109,13 +109,13 @@ sub get_user_info
     $acc_key =~ s/\\//g;
     $acc_key =~ s/ //g;
     $acc_key =~ s/"//g;
+    $acc_key =~ s/,//g;
     my $secret_key = $get_sec_key;
     my $sec_key = (split /:/, $secret_key)[1];
-    chop($sec_key);
-    chop($sec_key);
     $sec_key =~ s/\\//g;
     $sec_key =~ s/ //g;
     $sec_key =~ s/"//g;
+    $sec_key =~ s/,//g;
     return ($acc_key, $sec_key);
 }
 
