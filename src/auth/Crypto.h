@@ -25,6 +25,22 @@
 
 class CephContext;
 class CryptoHandler;
+class CryptoKeyContext;
+
+/*
+ * some per-key context that is specific to a particular crypto backend
+ */
+class CryptoKeyHandler {
+public:
+  bufferptr secret;
+
+  virtual ~CryptoKeyHandler() {}
+
+  virtual void encrypt(const bufferlist& in,
+		       bufferlist& out, std::string &error) const = 0;
+  virtual void decrypt(const bufferlist& in,
+		       bufferlist& out, std::string &error) const = 0;
+};
 
 /*
  * match encoding of struct ceph_secret
@@ -33,15 +49,23 @@ class CryptoKey {
 protected:
   __u16 type;
   utime_t created;
-  bufferptr secret;
+  bufferptr secret;   // must set this via set_secret()!
 
-  // cache a pointer to the handler, so we don't have to look it up
-  // for each crypto operation
+  // cache a pointer to the implementation-specific key handler, so we
+  // don't have to create it for every crypto operation.
   mutable CryptoHandler *ch;
+  mutable CryptoKeyHandler *ckh;
 
 public:
-  CryptoKey() : type(0), ch(NULL) { }
-  CryptoKey(int t, utime_t c, bufferptr& s) : type(t), created(c), secret(s), ch(NULL) { }
+  CryptoKey() : type(0), ckh(NULL) { }
+  CryptoKey(int t, utime_t c, bufferptr& s)
+    : type(t), created(c),
+      ch(NULL), ckh(NULL) {
+    set_secret(NULL, type, s);
+  }
+  ~CryptoKey() {
+    delete ckh;
+  }
 
   void encode(bufferlist& bl) const {
     ::encode(type, bl);
@@ -55,8 +79,10 @@ public:
     ::decode(created, bl);
     __u16 len;
     ::decode(len, bl);
-    bl.copy(len, secret);
-    secret.c_str();   // make sure it's a single buffer!
+    bufferptr tmp;
+    bl.copy(len, tmp);
+    tmp.c_str();   // make sure it's a single buffer!
+    set_secret(NULL, type, tmp);
   }
 
   int get_type() const { return type; }
@@ -94,8 +120,10 @@ public:
 
   // --
   int create(CephContext *cct, int type);
-  void encrypt(CephContext *cct, const bufferlist& in, bufferlist& out, std::string &error) const;
-  void decrypt(CephContext *cct, const bufferlist& in, bufferlist& out, std::string &error) const;
+  void encrypt(CephContext *cct, const bufferlist& in, bufferlist& out,
+	       std::string &error) const;
+  void decrypt(CephContext *cct, const bufferlist& in, bufferlist& out,
+	       std::string &error) const;
 
   void to_str(std::string& s) const;
 };
@@ -120,10 +148,8 @@ public:
   virtual int get_type() const = 0;
   virtual int create(bufferptr& secret) = 0;
   virtual int validate_secret(bufferptr& secret) = 0;
-  virtual void encrypt(const bufferptr& secret, const bufferlist& in,
-		      bufferlist& out, std::string &error) const = 0;
-  virtual void decrypt(const bufferptr& secret, const bufferlist& in,
-		      bufferlist& out, std::string &error) const = 0;
+  virtual CryptoKeyHandler *get_key_handler(const bufferptr& secret,
+					    string& error) = 0;
 
   static CryptoHandler *create(int type);
 };
