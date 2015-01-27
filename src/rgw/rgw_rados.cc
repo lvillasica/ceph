@@ -3923,7 +3923,7 @@ int RGWRados::Object::complete_atomic_modification()
     chain.push_obj(bucket.data_pool, key, loc);
   }
 
-  string tag = state->obj_tag.c_str();
+  string tag = (state->obj_tag.c_str() ? state->obj_tag.c_str() : "");
   int ret = store->gc->send_chain(chain, tag, false);  // do it async
 
   return ret;
@@ -4204,6 +4204,8 @@ int RGWRados::Object::Delete::delete_obj()
   if (r < 0)
     return r;
 
+  uint64_t obj_size = state->size;
+
   ObjectWriteOperation op;
 
   r = target->prepare_atomic_modification(op, false, NULL, NULL, NULL, true);
@@ -4226,7 +4228,7 @@ int RGWRados::Object::Delete::delete_obj()
   r = ref.ioctx.operate(ref.oid, &op);
   if (r == -ECANCELED) {
     /* raced with another operation, we can regard it as removed */
-    state->clear();
+    target->invalidate_state();
     r = 0;
   }
   bool removed = (r >= 0);
@@ -4254,10 +4256,8 @@ int RGWRados::Object::Delete::delete_obj()
   if (ret_not_existed)
     return -ENOENT;
 
-  if (state) {
-    /* update quota cache */
-    store->quota_handler->update_stats(params.bucket_owner, bucket, -1, 0, state->size);
-  }
+  /* update quota cache */
+  store->quota_handler->update_stats(params.bucket_owner, bucket, -1, 0, obj_size);
 
   return 0;
 }
